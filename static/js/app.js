@@ -73,11 +73,11 @@ window.addEventListener("DOMContentLoaded", render);
 async function renderTablesView() {
   app.innerHTML = `
     <section class="view">
-      <div class="view-header">
-        <h1>Tables</h1>
-        <a class="button" href="#/tables/new">+ Add Table</a>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">Tables</h1>
+        <a class="btn btn-primary" href="#/tables/new">+ Add Table</a>
       </div>
-      <ul class="table-list" id="table-list"><li class="muted">Loading&hellip;</li></ul>
+      <ul class="list-group" id="table-list"><li class="list-group-item text-muted">Loading&hellip;</li></ul>
     </section>
   `;
 
@@ -85,20 +85,20 @@ async function renderTablesView() {
   try {
     const tables = await api("/api/tables");
     if (tables.length === 0) {
-      listEl.innerHTML = `<li class="muted">No tables yet. Add one to get started.</li>`;
+      listEl.innerHTML = `<li class="list-group-item text-muted">No tables yet. Add one to get started.</li>`;
       return;
     }
     listEl.innerHTML = tables
       .map(
         (table) => `
-          <li>
-            <a href="#/tables/${encodeURIComponent(table.slug)}">${escapeHtml(table.name)}</a>
+          <li class="list-group-item p-0">
+            <a class="list-group-item list-group-item-action border-0" href="#/tables/${encodeURIComponent(table.slug)}">${escapeHtml(table.name)}</a>
           </li>
         `
       )
       .join("");
   } catch (err) {
-    listEl.innerHTML = `<li class="error">${escapeHtml(err.message)}</li>`;
+    listEl.innerHTML = `<li class="list-group-item text-danger">${escapeHtml(err.message)}</li>`;
   }
 }
 
@@ -109,23 +109,23 @@ async function renderTablesView() {
 function renderNewTableView() {
   app.innerHTML = `
     <section class="view">
-      <div class="view-header">
-        <h1>New Table</h1>
-        <a class="button secondary" href="#/tables">Cancel</a>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">New Table</h1>
+        <a class="btn btn-outline-secondary" href="#/tables">Cancel</a>
       </div>
-      <p class="error" id="form-error" hidden></p>
-      <form id="new-table-form">
-        <label class="field">
-          <span>Table name</span>
-          <input type="text" id="table-name" required />
-        </label>
+      <div class="alert alert-danger" id="form-error" hidden></div>
+      <form id="new-table-form" class="card p-3">
+        <div class="mb-3">
+          <label class="form-label" for="table-name">Table name</label>
+          <input type="text" class="form-control" id="table-name" required />
+        </div>
 
         <div id="fields-container"></div>
 
-        <button type="button" class="button secondary" id="add-field-btn">+ Add field</button>
+        <button type="button" class="btn btn-outline-secondary mb-3" id="add-field-btn">+ Add field</button>
 
-        <div class="form-actions">
-          <button type="submit" class="button primary">Save</button>
+        <div class="form-actions d-flex gap-2">
+          <button type="submit" class="btn btn-primary">Save</button>
         </div>
       </form>
     </section>
@@ -136,15 +136,17 @@ function renderNewTableView() {
 
   function addFieldRow() {
     const row = document.createElement("div");
-    row.className = "field-row";
+    row.className = "field-row row g-2 mb-2 align-items-center";
     row.innerHTML = `
-      <input type="text" class="field-name" placeholder="Field name" required />
-      <select class="field-type">
-        ${Object.entries(TYPE_LABELS)
-          .map(([value, label]) => `<option value="${value}">${label}</option>`)
-          .join("")}
-      </select>
-      <button type="button" class="button secondary remove-field-btn">Remove</button>
+      <div class="col"><input type="text" class="field-name form-control" placeholder="Field name" required /></div>
+      <div class="col-auto">
+        <select class="field-type form-select">
+          ${Object.entries(TYPE_LABELS)
+            .map(([value, label]) => `<option value="${value}">${label}</option>`)
+            .join("")}
+        </select>
+      </div>
+      <div class="col-auto"><button type="button" class="btn btn-outline-danger remove-field-btn">Remove</button></div>
     `;
     row.querySelector(".remove-field-btn").addEventListener("click", () => {
       if (fieldsContainer.children.length > 1) {
@@ -185,7 +187,7 @@ function renderNewTableView() {
 // ---------------------------------------------------------------------------
 
 async function renderTableDataView(slug) {
-  app.innerHTML = `<section class="view"><p class="muted">Loading&hellip;</p></section>`;
+  app.innerHTML = `<section class="view"><p class="text-muted">Loading&hellip;</p></section>`;
 
   let table;
   try {
@@ -193,8 +195,8 @@ async function renderTableDataView(slug) {
   } catch (err) {
     app.innerHTML = `
       <section class="view">
-        <p class="error">${escapeHtml(err.message)}</p>
-        <a class="button" href="#/tables">Back to Tables</a>
+        <div class="alert alert-danger">${escapeHtml(err.message)}</div>
+        <a class="btn btn-primary" href="#/tables">Back to Tables</a>
       </section>
     `;
     return;
@@ -211,13 +213,13 @@ async function renderTableDataView(slug) {
 
   app.innerHTML = `
     <section class="view">
-      <div class="view-header">
-        <h1>${escapeHtml(table.name)}</h1>
-        <a class="button secondary" href="#/tables">Back to Tables</a>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">${escapeHtml(table.name)}</h1>
+        <a class="btn btn-outline-secondary" href="#/tables">Back to Tables</a>
       </div>
 
-      <div class="table-scroll">
-        <table class="data-table">
+      <div class="table-responsive mb-4">
+        <table class="table table-hover align-middle data-table">
           <thead>
             <tr id="header-row"></tr>
             <tr id="filter-row"></tr>
@@ -226,13 +228,13 @@ async function renderTableDataView(slug) {
         </table>
       </div>
 
-      <h2 id="form-title">Add record</h2>
-      <p class="error" id="row-form-error" hidden></p>
-      <form id="row-form">
-        <div class="record-fields" id="record-fields"></div>
-        <div class="form-actions">
-          <button type="submit" class="button primary" id="row-save-btn">Add</button>
-          <button type="button" class="button secondary" id="row-cancel-btn" hidden>Cancel</button>
+      <h2 class="h5" id="form-title">Add record</h2>
+      <div class="alert alert-danger" id="row-form-error" hidden></div>
+      <form id="row-form" class="card p-3">
+        <div class="record-fields row g-3" id="record-fields"></div>
+        <div class="form-actions d-flex gap-2 mt-3">
+          <button type="submit" class="btn btn-primary" id="row-save-btn">Add</button>
+          <button type="button" class="btn btn-outline-secondary" id="row-cancel-btn" hidden>Cancel</button>
         </div>
       </form>
     </section>
@@ -285,7 +287,7 @@ function renderFilterRow(state) {
         <th>
           <input
             type="text"
-            class="filter-input"
+            class="filter-input form-control form-control-sm"
             data-slug="${escapeHtml(column.slug)}"
             placeholder="Filter&hellip;"
             value="${escapeHtml(state.filters[column.slug] || "")}"
@@ -338,7 +340,7 @@ function renderDataRows(state) {
   const rows = getVisibleRows(state);
 
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td class="muted" colspan="${state.columns.length + 1}">No records.</td></tr>`;
+    tbody.innerHTML = `<tr><td class="text-muted" colspan="${state.columns.length + 1}">No records.</td></tr>`;
     return;
   }
 
@@ -351,8 +353,8 @@ function renderDataRows(state) {
         <tr data-id="${row.id}">
           ${cells}
           <td class="actions-cell">
-            <button type="button" class="button secondary edit-btn">Edit</button>
-            <button type="button" class="button danger delete-btn">Delete</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary edit-btn">Edit</button>
+            <button type="button" class="btn btn-sm btn-outline-danger delete-btn">Delete</button>
           </td>
         </tr>
       `;
@@ -373,12 +375,12 @@ function renderRecordForm(state) {
     .map((column) => {
       const inputType = column.type === "number" ? "number" : "text";
       return `
-        <label class="field">
-          <span>${escapeHtml(column.name)}</span>
-          <input type="${inputType}" class="record-input" data-slug="${escapeHtml(column.slug)}" ${
+        <div class="col-md-4">
+          <label class="form-label">${escapeHtml(column.name)}</label>
+          <input type="${inputType}" class="record-input form-control" data-slug="${escapeHtml(column.slug)}" ${
         column.type === "number" ? "step='any'" : ""
       } />
-        </label>
+        </div>
       `;
     })
     .join("");
