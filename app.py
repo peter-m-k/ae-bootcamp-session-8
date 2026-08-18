@@ -3,13 +3,13 @@ from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 
-import db
+import logic
 
 app = Flask(__name__)
 app.config["DATABASE"] = os.environ.get(
     "DATABASE", str(Path(__file__).parent / "data.db")
 )
-db.init_app(app)
+logic.init_app(app)
 
 
 @app.route("/")
@@ -19,14 +19,14 @@ def index():
 
 @app.route("/api/tables", methods=["GET"])
 def list_tables():
-    return jsonify(db.list_tables())
+    return jsonify(logic.list_tables())
 
 
 @app.route("/api/tables", methods=["POST"])
 def create_table():
     payload = request.get_json(silent=True) or {}
     try:
-        table = db.create_table(payload.get("name"), payload.get("columns") or [])
+        table = logic.create_table(payload.get("name"), payload.get("columns") or [])
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
     return jsonify(table), 201
@@ -35,8 +35,8 @@ def create_table():
 @app.route("/api/tables/<slug>", methods=["GET"])
 def get_table(slug):
     try:
-        return jsonify(db.get_table_data(slug))
-    except db.TableNotFoundError:
+        return jsonify(logic.get_table_data(slug))
+    except logic.TableNotFoundError:
         return jsonify(error="Table not found."), 404
 
 
@@ -44,8 +44,8 @@ def get_table(slug):
 def create_row(slug):
     payload = request.get_json(silent=True) or {}
     try:
-        row = db.create_row(slug, payload)
-    except db.TableNotFoundError:
+        row = logic.create_row(slug, payload)
+    except logic.TableNotFoundError:
         return jsonify(error="Table not found."), 404
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
@@ -56,10 +56,10 @@ def create_row(slug):
 def update_row(slug, row_id):
     payload = request.get_json(silent=True) or {}
     try:
-        row = db.update_row(slug, row_id, payload)
-    except db.TableNotFoundError:
+        row = logic.update_row(slug, row_id, payload)
+    except logic.TableNotFoundError:
         return jsonify(error="Table not found."), 404
-    except db.RowNotFoundError:
+    except logic.RowNotFoundError:
         return jsonify(error="Record not found."), 404
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
@@ -69,10 +69,10 @@ def update_row(slug, row_id):
 @app.route("/api/tables/<slug>/rows/<int:row_id>", methods=["DELETE"])
 def delete_row(slug, row_id):
     try:
-        db.delete_row(slug, row_id)
-    except db.TableNotFoundError:
+        logic.delete_row(slug, row_id)
+    except logic.TableNotFoundError:
         return jsonify(error="Table not found."), 404
-    except db.RowNotFoundError:
+    except logic.RowNotFoundError:
         return jsonify(error="Record not found."), 404
     return "", 204
 

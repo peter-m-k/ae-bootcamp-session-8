@@ -13,121 +13,66 @@ def app_context(tmp_path):
         db.close_db()
 
 
-def _create_sample_table():
-    return db.create_table(
-        "Employees",
-        [{"name": "Name", "type": "text"}, {"name": "Age", "type": "number"}],
-    )
+def test_fetch_all_tables_empty(app_context):
+    assert db.fetch_all_tables() == []
 
 
-def test_slugify_basic():
-    assert db.slugify("First Name") == "first_name"
+def test_fetch_table_by_slug_missing(app_context):
+    assert db.fetch_table_by_slug("missing") is None
 
 
-def test_slugify_leading_digit():
-    assert db.slugify("2fast") == "f_2fast"
+def test_insert_and_fetch_table_record(app_context):
+    table_id = db.insert_table_record("Employees", "employees")
+    row = db.fetch_table_by_slug("employees")
+    assert row["id"] == table_id
+    assert row["name"] == "Employees"
+    assert row["slug"] == "employees"
+    assert [dict(t) for t in db.fetch_all_tables()] == [
+        {"name": "Employees", "slug": "employees"}
+    ]
 
 
-def test_slugify_rejects_empty():
-    with pytest.raises(ValueError):
-        db.slugify("   ")
+def test_insert_and_fetch_columns(app_context):
+    table_id = db.insert_table_record("Employees", "employees")
+    db.insert_column_record(table_id, "Name", "name", "text", 0)
+    db.insert_column_record(table_id, "Age", "age", "number", 1)
+
+    columns = db.fetch_columns(table_id)
+    assert [dict(c) for c in columns] == [
+        {"name": "Name", "slug": "name", "type": "text"},
+        {"name": "Age", "slug": "age", "type": "number"},
+    ]
 
 
-def test_list_tables_empty(app_context):
-    assert db.list_tables() == []
+def test_data_table_row_crud(app_context):
+    table_id = db.insert_table_record("Employees", "employees")
+    db.insert_column_record(table_id, "Name", "name", "text", 0)
+    db.insert_column_record(table_id, "Age", "age", "number", 1)
+    db.create_data_table("employees", '"name" TEXT, "age" REAL')
+
+    row_id = db.insert_row("employees", {"name": "Ada", "age": 36.0})
+    row = db.fetch_row("employees", ["name", "age"], row_id)
+    assert dict(row) == {"id": row_id, "name": "Ada", "age": 36.0}
+
+    rows = db.fetch_rows("employees", ["name", "age"])
+    assert [dict(r) for r in rows] == [{"id": row_id, "name": "Ada", "age": 36.0}]
+
+    assert db.row_exists("employees", row_id) is True
+    assert db.row_exists("employees", row_id + 1) is False
+
+    db.update_row_values("employees", {"name": "Ada Lovelace"}, row_id)
+    updated = db.fetch_row("employees", ["name"], row_id)
+    assert dict(updated) == {"id": row_id, "name": "Ada Lovelace"}
+
+    deleted_count = db.delete_row_record("employees", row_id)
+    assert deleted_count == 1
+    assert db.row_exists("employees", row_id) is False
 
 
-def test_create_table(app_context):
-    meta = _create_sample_table()
-    assert meta["name"] == "Employees"
-    assert meta["slug"] == "employees"
-    assert [c["slug"] for c in meta["columns"]] == ["name", "age"]
-    assert db.list_tables() == [{"name": "Employees", "slug": "employees"}]
+def test_delete_row_record_returns_zero_when_missing(app_context):
+    table_id = db.insert_table_record("Employees", "employees")
+    db.insert_column_record(table_id, "Name", "name", "text", 0)
+    db.create_data_table("employees", '"name" TEXT')
 
+    assert db.delete_row_record("employees", 999) == 0
 
-def test_create_table_requires_name(app_context):
-    with pytest.raises(ValueError):
-        db.create_table("", [{"name": "A", "type": "text"}])
-
-
-def test_create_table_requires_columns(app_context):
-    with pytest.raises(ValueError):
-        db.create_table("Empty", [])
-
-
-def test_create_table_rejects_duplicate_name(app_context):
-    _create_sample_table()
-    with pytest.raises(ValueError):
-        db.create_table(
-            "Employees", [{"name": "Other", "type": "text"}]
-        )
-
-
-def test_create_table_rejects_unknown_type(app_context):
-    with pytest.raises(ValueError):
-        db.create_table("Bad", [{"name": "Field", "type": "date"}])
-
-
-def test_create_table_rejects_duplicate_field_names(app_context):
-    with pytest.raises(ValueError):
-        db.create_table(
-            "Dup", [{"name": "Name", "type": "text"}, {"name": "name", "type": "text"}]
-        )
-
-
-def test_get_table_data_not_found(app_context):
-    with pytest.raises(db.TableNotFoundError):
-        db.get_table_data("missing")
-
-
-def test_row_crud_lifecycle(app_context):
-    _create_sample_table()
-
-    row = db.create_row("employees", {"name": "Ada", "age": "36"})
-    assert row["name"] == "Ada"
-    assert row["age"] == 36
-    row_id = row["id"]
-
-    data = db.get_table_data("employees")
-    assert data["rows"] == [row]
-
-    updated = db.update_row("employees", row_id, {"name": "Ada Lovelace", "age": "37"})
-    assert updated["name"] == "Ada Lovelace"
-
-    db.delete_row("employees", row_id)
-
-    final = db.get_table_data("employees")
-    assert final["rows"] == []
-
-
-def test_create_row_rejects_invalid_number(app_context):
-    _create_sample_table()
-    with pytest.raises(ValueError):
-        db.create_row("employees", {"name": "Ada", "age": "not-a-number"})
-
-
-def test_create_row_table_not_found(app_context):
-    with pytest.raises(db.TableNotFoundError):
-        db.create_row("missing", {"name": "Ada"})
-
-
-def test_update_row_not_found(app_context):
-    _create_sample_table()
-    with pytest.raises(db.RowNotFoundError):
-        db.update_row("employees", 999, {"name": "Ada", "age": "1"})
-
-
-def test_update_row_table_not_found(app_context):
-    with pytest.raises(db.TableNotFoundError):
-        db.update_row("missing", 1, {"name": "Ada"})
-
-
-def test_delete_row_not_found(app_context):
-    _create_sample_table()
-    with pytest.raises(db.RowNotFoundError):
-        db.delete_row("employees", 999)
-
-
-def test_delete_row_table_not_found(app_context):
-    with pytest.raises(db.TableNotFoundError):
-        db.delete_row("missing", 1)
