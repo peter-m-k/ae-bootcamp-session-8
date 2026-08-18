@@ -15,6 +15,7 @@ def test_index_serves_spa_shell(client):
     response = client.get("/")
     assert response.status_code == 200
     assert b'id="app"' in response.data
+    assert b"Reference Data Management" in response.data
 
 
 def test_list_tables_empty(client):

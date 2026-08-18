@@ -13,6 +13,12 @@ const TYPE_LABELS = {
 
 const NUMERIC_TYPES = new Set(["integer", "number"]);
 
+const APP_TITLE = "Reference Data Management";
+
+function setPageTitle(subtitle) {
+  document.title = subtitle ? `${APP_TITLE} - ${subtitle}` : APP_TITLE;
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
@@ -74,6 +80,7 @@ window.addEventListener("DOMContentLoaded", render);
 // ---------------------------------------------------------------------------
 
 async function renderTablesView() {
+  setPageTitle("Tables");
   app.innerHTML = `
     <section class="view">
       <div class="d-flex justify-content-between align-items-center mb-3">
@@ -110,6 +117,7 @@ async function renderTablesView() {
 // ---------------------------------------------------------------------------
 
 function renderNewTableView() {
+  setPageTitle("New Table");
   app.innerHTML = `
     <section class="view">
       <div class="d-flex justify-content-between align-items-center mb-3">
@@ -190,12 +198,14 @@ function renderNewTableView() {
 // ---------------------------------------------------------------------------
 
 async function renderTableDataView(slug) {
+  setPageTitle("Loading\u2026");
   app.innerHTML = `<section class="view"><p class="text-muted">Loading&hellip;</p></section>`;
 
   let table;
   try {
     table = await api(`/api/tables/${encodeURIComponent(slug)}`);
   } catch (err) {
+    setPageTitle("Table not found");
     app.innerHTML = `
       <section class="view">
         <div class="alert alert-danger">${escapeHtml(err.message)}</div>
@@ -204,6 +214,8 @@ async function renderTableDataView(slug) {
     `;
     return;
   }
+
+  setPageTitle(table.name);
 
   const state = {
     tableSlug: table.slug,
