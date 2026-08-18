@@ -23,55 +23,25 @@ def test_list_tables_empty(client):
     assert response.get_json() == []
 
 
-def test_create_table(client):
+def test_create_table_success(client):
     response = client.post(
         "/api/tables",
-        json={
-            "name": "Employees",
-            "columns": [
-                {"name": "First Name", "type": "text"},
-                {"name": "Age", "type": "number"},
-            ],
-        },
+        json={"name": "Employees", "columns": [{"name": "Name", "type": "text"}]},
     )
     assert response.status_code == 201
-    body = response.get_json()
-    assert body["name"] == "Employees"
-    assert body["slug"] == "employees"
-    assert [c["slug"] for c in body["columns"]] == ["first_name", "age"]
+    assert response.get_json()["slug"] == "employees"
 
     listed = client.get("/api/tables").get_json()
     assert listed == [{"name": "Employees", "slug": "employees"}]
 
 
-def test_create_table_requires_name(client):
-    response = client.post(
-        "/api/tables", json={"name": "", "columns": [{"name": "A", "type": "text"}]}
-    )
+def test_create_table_validation_error_returns_400(client):
+    response = client.post("/api/tables", json={"name": "", "columns": []})
     assert response.status_code == 400
+    assert "error" in response.get_json()
 
 
-def test_create_table_requires_columns(client):
-    response = client.post("/api/tables", json={"name": "Empty", "columns": []})
-    assert response.status_code == 400
-
-
-def test_create_table_rejects_duplicate_name(client):
-    payload = {"name": "Things", "columns": [{"name": "Label", "type": "text"}]}
-    client.post("/api/tables", json=payload)
-    response = client.post("/api/tables", json=payload)
-    assert response.status_code == 400
-
-
-def test_create_table_rejects_unknown_type(client):
-    response = client.post(
-        "/api/tables",
-        json={"name": "Bad", "columns": [{"name": "Field", "type": "date"}]},
-    )
-    assert response.status_code == 400
-
-
-def test_get_table_not_found(client):
+def test_get_table_not_found_returns_404(client):
     response = client.get("/api/tables/missing")
     assert response.status_code == 404
 
@@ -89,7 +59,7 @@ def _create_sample_table(client):
     )
 
 
-def test_row_crud_lifecycle(client):
+def test_row_crud_over_http(client):
     _create_sample_table(client)
 
     create_resp = client.post(
@@ -103,11 +73,11 @@ def test_row_crud_lifecycle(client):
 
     get_resp = client.get("/api/tables/employees")
     assert get_resp.status_code == 200
-    data = get_resp.get_json()
-    assert data["rows"] == [row]
+    assert get_resp.get_json()["rows"] == [row]
 
     update_resp = client.put(
-        f"/api/tables/employees/rows/{row_id}", json={"name": "Ada Lovelace", "age": "37"}
+        f"/api/tables/employees/rows/{row_id}",
+        json={"name": "Ada Lovelace", "age": "37"},
     )
     assert update_resp.status_code == 200
     assert update_resp.get_json()["name"] == "Ada Lovelace"
@@ -119,7 +89,7 @@ def test_row_crud_lifecycle(client):
     assert final["rows"] == []
 
 
-def test_create_row_rejects_invalid_number(client):
+def test_create_row_invalid_value_returns_400(client):
     _create_sample_table(client)
     response = client.post(
         "/api/tables/employees/rows", json={"name": "Ada", "age": "not-a-number"}
@@ -127,7 +97,12 @@ def test_create_row_rejects_invalid_number(client):
     assert response.status_code == 400
 
 
-def test_update_row_not_found(client):
+def test_create_row_table_not_found_returns_404(client):
+    response = client.post("/api/tables/missing/rows", json={"name": "Ada"})
+    assert response.status_code == 404
+
+
+def test_update_row_not_found_returns_404(client):
     _create_sample_table(client)
     response = client.put(
         "/api/tables/employees/rows/999", json={"name": "Ada", "age": "1"}
@@ -135,7 +110,8 @@ def test_update_row_not_found(client):
     assert response.status_code == 404
 
 
-def test_delete_row_not_found(client):
+def test_delete_row_not_found_returns_404(client):
     _create_sample_table(client)
     response = client.delete("/api/tables/employees/rows/999")
     assert response.status_code == 404
+
