@@ -42,6 +42,14 @@ def test_create_table_validation_error_returns_400(client):
     assert "error" in response.get_json()
 
 
+def test_create_table_rejects_reserved_column_name(client):
+    response = client.post(
+        "/api/tables",
+        json={"name": "Bad", "columns": [{"name": "PK", "type": "text"}]},
+    )
+    assert response.status_code == 400
+
+
 def test_integer_column_round_trip(client):
     client.post(
         "/api/tables",
@@ -83,7 +91,9 @@ def test_row_crud_over_http(client):
     row = create_resp.get_json()
     assert row["name"] == "Ada"
     assert row["age"] == 36
-    row_id = row["id"]
+    assert row["CREATE_TS"]
+    assert row["UPDATE_TS"] is None
+    row_id = row["PK"]
 
     get_resp = client.get("/api/tables/employees")
     assert get_resp.status_code == 200
@@ -95,6 +105,7 @@ def test_row_crud_over_http(client):
     )
     assert update_resp.status_code == 200
     assert update_resp.get_json()["name"] == "Ada Lovelace"
+    assert update_resp.get_json()["UPDATE_TS"]
 
     delete_resp = client.delete(f"/api/tables/employees/rows/{row_id}")
     assert delete_resp.status_code == 204

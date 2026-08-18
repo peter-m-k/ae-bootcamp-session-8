@@ -41,7 +41,13 @@ def test_create_table(app_context):
     meta = _create_sample_table()
     assert meta["name"] == "Employees"
     assert meta["slug"] == "employees"
-    assert [c["slug"] for c in meta["columns"]] == ["name", "age"]
+    assert [c["slug"] for c in meta["columns"]] == [
+        "PK",
+        "CREATE_TS",
+        "UPDATE_TS",
+        "name",
+        "age",
+    ]
     assert logic.list_tables() == [{"name": "Employees", "slug": "employees"}]
 
 
@@ -73,6 +79,12 @@ def test_create_table_rejects_duplicate_field_names(app_context):
         )
 
 
+@pytest.mark.parametrize("reserved_name", ["PK", "pk", "Create_TS", "UPDATE_TS"])
+def test_create_table_rejects_reserved_column_names(app_context, reserved_name):
+    with pytest.raises(ValueError):
+        logic.create_table("Bad", [{"name": reserved_name, "type": "text"}])
+
+
 def test_get_table_data_not_found(app_context):
     with pytest.raises(logic.TableNotFoundError):
         logic.get_table_data("missing")
@@ -84,7 +96,10 @@ def test_row_crud_lifecycle(app_context):
     row = logic.create_row("employees", {"name": "Ada", "age": "36"})
     assert row["name"] == "Ada"
     assert row["age"] == 36
-    row_id = row["id"]
+    assert row["PK"] is not None
+    assert row["CREATE_TS"]
+    assert row["UPDATE_TS"] is None
+    row_id = row["PK"]
 
     data = logic.get_table_data("employees")
     assert data["rows"] == [row]
@@ -93,6 +108,8 @@ def test_row_crud_lifecycle(app_context):
         "employees", row_id, {"name": "Ada Lovelace", "age": "37"}
     )
     assert updated["name"] == "Ada Lovelace"
+    assert updated["CREATE_TS"] == row["CREATE_TS"]
+    assert updated["UPDATE_TS"]
 
     logic.delete_row("employees", row_id)
 
@@ -110,7 +127,11 @@ def test_create_table_with_integer_column(app_context):
     meta = logic.create_table(
         "Orders", [{"name": "Quantity", "type": "integer"}]
     )
-    assert meta["columns"] == [{"name": "Quantity", "slug": "quantity", "type": "integer"}]
+    system_slugs = {c["slug"] for c in logic.SYSTEM_COLUMNS}
+    user_columns = [c for c in meta["columns"] if c["slug"] not in system_slugs]
+    assert user_columns == [
+        {"name": "Quantity", "slug": "quantity", "type": "integer", "editable": True, "filterable": True}
+    ]
 
     row = logic.create_row("orders", {"quantity": "5"})
     assert row["quantity"] == 5

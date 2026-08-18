@@ -297,8 +297,11 @@ function renderHeaderRow(state) {
 function renderFilterRow(state) {
   const filterRow = document.getElementById("filter-row");
   const cells = state.columns
-    .map(
-      (column) => `
+    .map((column) => {
+      if (column.filterable === false) {
+        return "<th></th>";
+      }
+      return `
         <th>
           <input
             type="text"
@@ -308,8 +311,8 @@ function renderFilterRow(state) {
             value="${escapeHtml(state.filters[column.slug] || "")}"
           />
         </th>
-      `
-    )
+      `;
+    })
     .join("");
   filterRow.innerHTML = `${cells}<th></th>`;
 
@@ -387,6 +390,7 @@ function renderDataRows(state) {
 function renderRecordForm(state) {
   const container = document.getElementById("record-fields");
   container.innerHTML = state.columns
+    .filter((column) => column.editable !== false)
     .map((column) => {
       const inputType = NUMERIC_TYPES.has(column.type) ? "number" : "text";
       const step = column.type === "integer" ? "1" : column.type === "number" ? "any" : null;

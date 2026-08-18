@@ -3,6 +3,7 @@ layer (db.py): validation, naming rules, and workflow orchestration.
 """
 
 import re
+from datetime import datetime, timezone
 
 import db
 
@@ -12,6 +13,17 @@ ALLOWED_TYPES = {
     "integer": "INTEGER",
     "number": "REAL",
 }
+
+# Every data table gets these columns automatically; users cannot define
+# fields with these names. They are read-only and excluded from filtering,
+# but remain sortable like any other column.
+SYSTEM_COLUMN_DEFS_SQL = "PK INTEGER PRIMARY KEY, CREATE_TS TEXT NOT NULL, UPDATE_TS TEXT"
+SYSTEM_COLUMNS = [
+    {"name": "PK", "slug": "PK", "type": "integer", "editable": False, "filterable": False},
+    {"name": "CREATE_TS", "slug": "CREATE_TS", "type": "text", "editable": False, "filterable": False},
+    {"name": "UPDATE_TS", "slug": "UPDATE_TS", "type": "text", "editable": False, "filterable": False},
+]
+RESERVED_COLUMN_SLUGS = {"pk", "create_ts", "update_ts"}
 
 _SLUG_INVALID_RE = re.compile(r"[^a-z0-9]+")
 
@@ -38,17 +50,24 @@ def slugify(value):
     return slug
 
 
+def _now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
 def get_table_meta(slug):
     """Return {"id", "name", "slug", "columns"} for a table, or None."""
     table = db.fetch_table_by_slug(slug)
     if table is None:
         return None
     columns = db.fetch_columns(table["id"])
+    user_columns = [
+        {**dict(column), "editable": True, "filterable": True} for column in columns
+    ]
     return {
         "id": table["id"],
         "name": table["name"],
         "slug": table["slug"],
-        "columns": [dict(column) for column in columns],
+        "columns": [dict(column) for column in SYSTEM_COLUMNS] + user_columns,
     }
 
 
@@ -81,6 +100,8 @@ def create_table(name, columns):
         if col_type not in ALLOWED_TYPES:
             raise ValueError(f'Unsupported field type "{col_type}".')
         col_slug = slugify(col_name)
+        if col_slug in RESERVED_COLUMN_SLUGS:
+            raise ValueError(f'"{col_name}" is a reserved column name.')
         if col_slug in seen_slugs:
             raise ValueError(f'Duplicate field name "{col_name}".')
         seen_slugs.add(col_slug)
@@ -88,10 +109,11 @@ def create_table(name, columns):
 
     table_id = db.insert_table_record(name, table_slug)
 
-    column_defs = ", ".join(
+    user_defs = ", ".join(
         f'"{col_slug}" {ALLOWED_TYPES[col_type]}'
         for _, col_slug, col_type in prepared_columns
     )
+    column_defs = SYSTEM_COLUMN_DEFS_SQL + (f", {user_defs}" if user_defs else "")
     db.create_data_table(table_slug, column_defs)
 
     for position, (col_name, col_slug, col_type) in enumerate(prepared_columns):
@@ -109,8 +131,7 @@ def get_table_data(slug):
     if meta is None:
         raise TableNotFoundError(f'Table "{slug}" not found.')
 
-    column_slugs = [column["slug"] for column in meta["columns"]]
-    rows = db.fetch_rows(meta["slug"], column_slugs)
+    rows = db.fetch_rows(meta["slug"], _select_slugs(meta))
     return {
         "name": meta["name"],
         "slug": meta["slug"],
@@ -146,6 +167,11 @@ def _coerce_row_values(columns, payload):
     return values
 
 
+def _select_slugs(meta):
+    """All column slugs to fetch, excluding PK (fetch_row/fetch_rows add it)."""
+    return [column["slug"] for column in meta["columns"] if column["slug"] != "PK"]
+
+
 def create_row(slug, payload):
     """Insert a row into a table and return it.
 
@@ -155,11 +181,12 @@ def create_row(slug, payload):
     if meta is None:
         raise TableNotFoundError(f'Table "{slug}" not found.')
 
-    values = _coerce_row_values(meta["columns"], payload)
-    col_slugs = list(values.keys())
+    editable_columns = [c for c in meta["columns"] if c["editable"]]
+    values = _coerce_row_values(editable_columns, payload)
+    values["CREATE_TS"] = _now_iso()
 
     row_id = db.insert_row(meta["slug"], values)
-    row = db.fetch_row(meta["slug"], col_slugs, row_id)
+    row = db.fetch_row(meta["slug"], _select_slugs(meta), row_id)
     return dict(row)
 
 
@@ -174,11 +201,12 @@ def update_row(slug, row_id, payload):
     if not db.row_exists(meta["slug"], row_id):
         raise RowNotFoundError(f"Record {row_id} not found.")
 
-    values = _coerce_row_values(meta["columns"], payload)
-    col_slugs = list(values.keys())
+    editable_columns = [c for c in meta["columns"] if c["editable"]]
+    values = _coerce_row_values(editable_columns, payload)
+    values["UPDATE_TS"] = _now_iso()
 
     db.update_row_values(meta["slug"], values, row_id)
-    row = db.fetch_row(meta["slug"], col_slugs, row_id)
+    row = db.fetch_row(meta["slug"], _select_slugs(meta), row_id)
     return dict(row)
 
 

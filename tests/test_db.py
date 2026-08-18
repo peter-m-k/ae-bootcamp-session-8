@@ -48,21 +48,23 @@ def test_data_table_row_crud(app_context):
     table_id = db.insert_table_record("Employees", "employees")
     db.insert_column_record(table_id, "Name", "name", "text", 0)
     db.insert_column_record(table_id, "Age", "age", "number", 1)
-    db.create_data_table("employees", '"name" TEXT, "age" REAL')
+    db.create_data_table(
+        "employees", 'PK INTEGER PRIMARY KEY, "name" TEXT, "age" REAL'
+    )
 
     row_id = db.insert_row("employees", {"name": "Ada", "age": 36.0})
     row = db.fetch_row("employees", ["name", "age"], row_id)
-    assert dict(row) == {"id": row_id, "name": "Ada", "age": 36.0}
+    assert dict(row) == {"PK": row_id, "name": "Ada", "age": 36.0}
 
     rows = db.fetch_rows("employees", ["name", "age"])
-    assert [dict(r) for r in rows] == [{"id": row_id, "name": "Ada", "age": 36.0}]
+    assert [dict(r) for r in rows] == [{"PK": row_id, "name": "Ada", "age": 36.0}]
 
     assert db.row_exists("employees", row_id) is True
     assert db.row_exists("employees", row_id + 1) is False
 
     db.update_row_values("employees", {"name": "Ada Lovelace"}, row_id)
     updated = db.fetch_row("employees", ["name"], row_id)
-    assert dict(updated) == {"id": row_id, "name": "Ada Lovelace"}
+    assert dict(updated) == {"PK": row_id, "name": "Ada Lovelace"}
 
     deleted_count = db.delete_row_record("employees", row_id)
     assert deleted_count == 1
@@ -72,7 +74,7 @@ def test_data_table_row_crud(app_context):
 def test_delete_row_record_returns_zero_when_missing(app_context):
     table_id = db.insert_table_record("Employees", "employees")
     db.insert_column_record(table_id, "Name", "name", "text", 0)
-    db.create_data_table("employees", '"name" TEXT')
+    db.create_data_table("employees", 'PK INTEGER PRIMARY KEY, "name" TEXT')
 
     assert db.delete_row_record("employees", 999) == 0
 

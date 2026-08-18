@@ -87,30 +87,31 @@ def insert_column_record(table_id, name, slug, col_type, position):
 
 
 def create_data_table(slug, column_defs_sql):
+    """Create a data table. column_defs_sql must include the PK column
+    definition — this function does not assume any particular schema.
+    """
     db = get_db()
-    db.execute(
-        f'CREATE TABLE "{slug}" (id INTEGER PRIMARY KEY AUTOINCREMENT, {column_defs_sql})'
-    )
+    db.execute(f'CREATE TABLE "{slug}" ({column_defs_sql})')
     db.commit()
 
 
 def fetch_rows(slug, column_slugs):
     db = get_db()
-    select_cols = ", ".join(["id"] + [f'"{s}"' for s in column_slugs])
-    return db.execute(f'SELECT {select_cols} FROM "{slug}" ORDER BY id').fetchall()
+    select_cols = ", ".join(["PK"] + [f'"{s}"' for s in column_slugs])
+    return db.execute(f'SELECT {select_cols} FROM "{slug}" ORDER BY PK').fetchall()
 
 
 def fetch_row(slug, column_slugs, row_id):
     db = get_db()
-    select_cols = ", ".join(["id"] + [f'"{s}"' for s in column_slugs])
+    select_cols = ", ".join(["PK"] + [f'"{s}"' for s in column_slugs])
     return db.execute(
-        f'SELECT {select_cols} FROM "{slug}" WHERE id = ?', (row_id,)
+        f'SELECT {select_cols} FROM "{slug}" WHERE PK = ?', (row_id,)
     ).fetchone()
 
 
 def row_exists(slug, row_id):
     db = get_db()
-    row = db.execute(f'SELECT id FROM "{slug}" WHERE id = ?', (row_id,)).fetchone()
+    row = db.execute(f'SELECT PK FROM "{slug}" WHERE PK = ?', (row_id,)).fetchone()
     return row is not None
 
 
@@ -132,7 +133,7 @@ def update_row_values(slug, values, row_id):
     col_slugs = list(values.keys())
     assignments = ", ".join(f'"{c}" = ?' for c in col_slugs)
     db.execute(
-        f'UPDATE "{slug}" SET {assignments} WHERE id = ?',
+        f'UPDATE "{slug}" SET {assignments} WHERE PK = ?',
         [*(values[c] for c in col_slugs), row_id],
     )
     db.commit()
@@ -140,6 +141,6 @@ def update_row_values(slug, values, row_id):
 
 def delete_row_record(slug, row_id):
     db = get_db()
-    cursor = db.execute(f'DELETE FROM "{slug}" WHERE id = ?', (row_id,))
+    cursor = db.execute(f'DELETE FROM "{slug}" WHERE PK = ?', (row_id,))
     db.commit()
     return cursor.rowcount
