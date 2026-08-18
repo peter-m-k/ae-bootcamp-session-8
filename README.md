@@ -42,6 +42,20 @@ A small Flask app that lets users define their own data tables (like a mini Airt
 
 Every user-defined table automatically gets three system columns: `PK` (primary key), `CREATE_TS`, and `UPDATE_TS`. These are read-only and managed by the server.
 
+```mermaid
+graph TD
+    UI["Front-end UI<br/>templates/index.html + static/"]
+    App["app.py<br/>Display layer (Flask routes / HTTP)"]
+    Logic["logic.py<br/>Business logic (validation, orchestration)"]
+    DB["db.py<br/>Data-access layer (SQLite queries)"]
+    SQLite[("SQLite database")]
+
+    UI -->|HTTP requests / JSON| App
+    App -->|calls| Logic
+    Logic -->|calls| DB
+    DB -->|reads/writes| SQLite
+```
+
 ## API
 
 | Method | Path | Description |
