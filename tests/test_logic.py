@@ -106,6 +106,23 @@ def test_create_row_rejects_invalid_number(app_context):
         logic.create_row("employees", {"name": "Ada", "age": "not-a-number"})
 
 
+def test_create_table_with_integer_column(app_context):
+    meta = logic.create_table(
+        "Orders", [{"name": "Quantity", "type": "integer"}]
+    )
+    assert meta["columns"] == [{"name": "Quantity", "slug": "quantity", "type": "integer"}]
+
+    row = logic.create_row("orders", {"quantity": "5"})
+    assert row["quantity"] == 5
+    assert isinstance(row["quantity"], int)
+
+
+def test_create_row_rejects_non_integer_value(app_context):
+    logic.create_table("Orders", [{"name": "Quantity", "type": "integer"}])
+    with pytest.raises(ValueError):
+        logic.create_row("orders", {"quantity": "3.5"})
+
+
 def test_create_row_table_not_found(app_context):
     with pytest.raises(logic.TableNotFoundError):
         logic.create_row("missing", {"name": "Ada"})

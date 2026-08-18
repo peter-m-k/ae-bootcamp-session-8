@@ -9,6 +9,7 @@ import db
 # Maps the field types offered in the "New Table" form to SQLite column types.
 ALLOWED_TYPES = {
     "text": "TEXT",
+    "integer": "INTEGER",
     "number": "REAL",
 }
 
@@ -122,7 +123,17 @@ def _coerce_row_values(columns, payload):
     values = {}
     for column in columns:
         raw = payload.get(column["slug"])
-        if column["type"] == "number":
+        if column["type"] == "integer":
+            if raw in (None, ""):
+                values[column["slug"]] = None
+            else:
+                try:
+                    values[column["slug"]] = int(str(raw).strip())
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        f'"{column["name"]}" must be a whole number.'
+                    ) from None
+        elif column["type"] == "number":
             if raw in (None, ""):
                 values[column["slug"]] = None
             else:

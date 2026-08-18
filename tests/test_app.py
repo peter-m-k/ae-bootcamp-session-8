@@ -41,6 +41,19 @@ def test_create_table_validation_error_returns_400(client):
     assert "error" in response.get_json()
 
 
+def test_integer_column_round_trip(client):
+    client.post(
+        "/api/tables",
+        json={"name": "Orders", "columns": [{"name": "Quantity", "type": "integer"}]},
+    )
+    create_resp = client.post("/api/tables/orders/rows", json={"quantity": "5"})
+    assert create_resp.status_code == 201
+    assert create_resp.get_json()["quantity"] == 5
+
+    invalid_resp = client.post("/api/tables/orders/rows", json={"quantity": "3.5"})
+    assert invalid_resp.status_code == 400
+
+
 def test_get_table_not_found_returns_404(client):
     response = client.get("/api/tables/missing")
     assert response.status_code == 404

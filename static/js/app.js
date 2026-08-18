@@ -7,8 +7,11 @@ const app = document.getElementById("app");
 
 const TYPE_LABELS = {
   text: "Text",
-  number: "Number",
+  integer: "Whole Number (Integer)",
+  number: "Decimal Number",
 };
+
+const NUMERIC_TYPES = new Set(["integer", "number"]);
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -325,7 +328,7 @@ function getVisibleRows(state) {
       if (av == null && bv == null) return 0;
       if (av == null) return 1;
       if (bv == null) return -1;
-      if (column && column.type === "number") {
+      if (column && NUMERIC_TYPES.has(column.type)) {
         return (av - bv) * factor;
       }
       return String(av).localeCompare(String(bv)) * factor;
@@ -373,12 +376,13 @@ function renderRecordForm(state) {
   const container = document.getElementById("record-fields");
   container.innerHTML = state.columns
     .map((column) => {
-      const inputType = column.type === "number" ? "number" : "text";
+      const inputType = NUMERIC_TYPES.has(column.type) ? "number" : "text";
+      const step = column.type === "integer" ? "1" : column.type === "number" ? "any" : null;
       return `
         <div class="col-md-4">
           <label class="form-label">${escapeHtml(column.name)}</label>
           <input type="${inputType}" class="record-input form-control" data-slug="${escapeHtml(column.slug)}" ${
-        column.type === "number" ? "step='any'" : ""
+        step ? `step="${step}"` : ""
       } />
         </div>
       `;
