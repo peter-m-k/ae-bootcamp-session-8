@@ -13,10 +13,20 @@ const TYPE_LABELS = {
 
 const NUMERIC_TYPES = new Set(["integer", "number"]);
 
+const TIMESTAMP_SLUGS = new Set(["CREATE_TS", "UPDATE_TS"]);
+
 const APP_TITLE = "Reference Data Management";
 
 function setPageTitle(subtitle) {
   document.title = subtitle ? `${APP_TITLE} - ${subtitle}` : APP_TITLE;
+}
+
+// Storage keeps full ISO-8601 precision; display truncates to whole seconds
+// and swaps the "T" separator for a space.
+function formatTimestampForDisplay(value) {
+  if (!value) return "";
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+  return match ? `${match[1]} ${match[2]}` : value;
 }
 
 function escapeHtml(value) {
@@ -365,10 +375,15 @@ function renderDataRows(state) {
   tbody.innerHTML = rows
     .map((row) => {
       const cells = state.columns
-        .map((column) => `<td>${escapeHtml(row[column.slug])}</td>`)
+        .map((column) => {
+          const value = TIMESTAMP_SLUGS.has(column.slug)
+            ? formatTimestampForDisplay(row[column.slug])
+            : row[column.slug];
+          return `<td>${escapeHtml(value)}</td>`;
+        })
         .join("");
       return `
-        <tr data-id="${row.id}">
+        <tr data-id="${row.PK}">
           ${cells}
           <td class="actions-cell">
             <button type="button" class="btn btn-sm btn-outline-secondary edit-btn">Edit</button>
@@ -381,7 +396,7 @@ function renderDataRows(state) {
 
   tbody.querySelectorAll("tr").forEach((tr) => {
     const id = Number(tr.dataset.id);
-    const row = state.rows.find((r) => r.id === id);
+    const row = state.rows.find((r) => r.PK === id);
     tr.querySelector(".edit-btn").addEventListener("click", () => enterEditMode(state, row));
     tr.querySelector(".delete-btn").addEventListener("click", () => deleteRecord(state, id));
   });
@@ -420,7 +435,7 @@ function clearRecordForm() {
 }
 
 function enterEditMode(state, row) {
-  state.editingId = row.id;
+  state.editingId = row.PK;
   document.getElementById("form-title").textContent = "Edit record";
   document.getElementById("row-save-btn").textContent = "Save changes";
   document.getElementById("row-cancel-btn").hidden = false;
@@ -457,7 +472,7 @@ async function saveRecord(slug, state) {
         `/api/tables/${encodeURIComponent(slug)}/rows/${state.editingId}`,
         { method: "PUT", body: JSON.stringify(payload) }
       );
-      const index = state.rows.findIndex((row) => row.id === state.editingId);
+      const index = state.rows.findIndex((row) => row.PK === state.editingId);
       state.rows[index] = updated;
     }
     exitEditMode(state);
@@ -478,7 +493,7 @@ async function deleteRecord(state, id) {
     window.alert(err.message);
     return;
   }
-  state.rows = state.rows.filter((row) => row.id !== id);
+  state.rows = state.rows.filter((row) => row.PK !== id);
   if (state.editingId === id) {
     exitEditMode(state);
   }
